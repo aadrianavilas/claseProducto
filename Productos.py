@@ -16,10 +16,10 @@ class GarantiaInvalida(ManejarError):...
 class Producto:
     def __init__(self,codigo:str,nombre:str,precio:float,stock:int,tipo:Optional[str]=None,fecha_vencimiento:Optional[str]=None,garantia:Optional[int]=None):
         self.codigo=codigo
-        self.nombre=nombre
+        self._nombre=nombre
         self.__precio=precio
         self.__stock=stock
-        self.tipo=tipo
+        self._tipo=tipo
         self.__fecha_vencimiento=fecha_vencimiento
         self.__garantia=garantia
 
@@ -35,6 +35,16 @@ class Producto:
                 f"Garantia: {self.garantia}",
             ])
     
+    @property
+    def nombre(self)->str:
+        return self._nombre
+    
+    @nombre.setter
+    def nombre(self,nombre)->None:
+        if nombre.strip()=="":
+            raise ManejarError('El nombre no puede estar vacio')
+        self._nombre=nombre
+
     @property
     def precio(self)->int:
         return self.__precio
@@ -56,6 +66,16 @@ class Producto:
         if stock<0:
             raise StockInvalido('El stock no puede ser negativo')
         self.__stock=stock
+
+    @property
+    def tipo(self)->str:
+        return self._tipo
+    
+    @nombre.setter
+    def tipo(self,tipo)->None:
+        if tipo.strip()=="":
+            raise ManejarError('El tipo del producto no puede estar vacio')
+        self._tipo=tipo
 
     @property
     def fecha_vencimiento(self)->str:
@@ -178,7 +198,9 @@ if __name__ == "__main__":
             ('5','Producto5',20.99,20,'Tipo1','13/02/2026',1)
         ]
         
-        cargar_productos(datos)
+        # cargar_productos(datos)
+        p=Producto('2','Producto2',253.34,30,'Tipo2','Sin fecha Vencimiento',1)
+        p.tipo="   "
 
         #print(f"El total de inventario es: {calcular_total_inventario()}")
         #print(f"El total de stock es: {calcular_total_stock()}")
