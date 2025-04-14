@@ -3,6 +3,7 @@ from datetime import datetime
 from tabulate import tabulate
 import time
 
+#manejo de errores personalizados
 class ManejarError(Exception):
     def __init__(self,mensaje):
         self.mensaje=mensaje
