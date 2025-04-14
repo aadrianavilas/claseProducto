@@ -1,152 +1,196 @@
-from typing import List,Dict,Any,Optional
-from manage_error import ManageError
+from typing import List,Dict,Optional,Any,Tuple
+from datetime import datetime
+from tabulate import tabulate
 import time
 
-productos_guardados: List[Dict[str, Any]] = []
+class ManejarError(Exception):
+    def __init__(self,mensaje):
+        self.mensaje=mensaje
+        super().__init__(self.mensaje)
+class FechaInvalida(ManejarError):...
+class PrecioInvalido(ManejarError):...
+class StockInvalido(ManejarError):...
+class GarantiaInvalida(ManejarError):...
 
-class ManageError(Exception):
-    def __init__(self,message:str)->None:
-        self.message=message
-        super().__init__(self.message)
 
-    
-class Producto:   
-    def __init__(self,codigo:str,nombre:str,precio:str,stock:int,categoria:str,tipo:Optional[str]=None,fecha_vencimiento:Optional[str]=None,garantia:Optional[int]=None)->None:
+class Producto:
+    def __init__(self,codigo:str,nombre:str,precio:float,stock:int,tipo:Optional[str]=None,fecha_vencimiento:Optional[str]=None,garantia:Optional[int]=None):
         self.codigo=codigo
         self.nombre=nombre
         self.__precio=precio
         self.__stock=stock
-        self.categoria=categoria
         self.tipo=tipo
-        self._fecha_vencimiento=fecha_vencimiento
-        self._garantia=garantia
-    
-    def validar_precio(funcion):
-        def wrapper(self,precio:float)->None:
-            try:
-                if not isinstance(precio, float):
-                    raise ManageError('Precio no válido')
-                if precio<=0:
-                    raise ManageError('El precio debe ser mayor a cero')
-                
-                funcion(self,precio)
-            except ManageError as e:
-                print(f"Error: {e}")
-        return wrapper
-    
+        self.__fecha_vencimiento=fecha_vencimiento
+        self.__garantia=garantia
 
+    def __str__(self)->str:
+        return  "\n".join([
+                "\nPRODUCTO",
+                f"Código: '{self.codigo}'",
+                f"Nombre: '{self.nombre}'",
+                f"Precio: {self.precio}",
+                f"Stock: {self.stock}",
+                f"Tipo: '{self.tipo}'",
+                f"Fecha de vencimiento: '{self.fecha_vencimiento}'",
+                f"Garantia: {self.garantia}",
+            ])
+    
     @property
-    def precio(self)->float:
+    def precio(self)->int:
         return self.__precio
     
     @precio.setter
-    @validar_precio
-    def precio(self,precio:float)->None:
+    def precio(self,precio)->None:
+        if not isinstance(precio,float):
+            raise PrecioInvalido('Precio no válido')
+        if precio<0:
+            raise PrecioInvalido('El precio no puede ser negativo')
         self.__precio=precio
-
-
-    def validar_stock(funcion):
-        def wrapper(self,stock:int)->None:
-            try:
-                if stock<=0:
-                    raise ManageError('El stock debe ser mayor a cero')
-                funcion(self,stock)
-            except ManageError as e:
-                print(f"Error: {e}")
-        return wrapper
-
 
     @property
     def stock(self)->int:
         return self.__stock
     
     @stock.setter
-    @validar_stock
-    def stock(self,stock:int)->None:
+    def stock(self,stock)->None:
+        if stock<0:
+            raise StockInvalido('El stock no puede ser negativo')
         self.__stock=stock
 
-    def validar_garantia(funcion):
-        def wrapper(self,garantia:int)->None:
-            try:
-                if garantia<0:
-                    raise ManageError('La garantia debe ser mayor o igual a cero')
-                funcion(self,garantia)
-            except ManageError as e:
-                print(f"Error: {e}")
-        return wrapper
+    @property
+    def fecha_vencimiento(self)->str:
+        return self.__fecha_vencimiento
     
+    @fecha_vencimiento.setter
+    def fecha_vencimiento(self,fecha_vencimiento)->None:
+        if not isinstance(fecha_vencimiento,str):
+                raise FechaInvalida('La fecha debe ser texto')
+                
+        try:          
+            if fecha_vencimiento.lower()=="sin fecha vencimiento":
+                pass
+            else:
+                datetime.strptime(fecha_vencimiento,'%d/%m/%Y')
+        except ValueError:
+            raise ManejarError('Formato de fecha no válido. Usa DD/MM/AAAA.')
+
+        self.__fecha_vencimiento=fecha_vencimiento
+
     @property
     def garantia(self)->int:
-        return self._garantia
+        return self.__garantia
     
     @garantia.setter
-    @validar_garantia
-    def garantia(self,garantia:int)->None:
-        self._garantia=garantia
+    def garantia(self,garantia)->None:
+        if garantia<0:
+            raise GarantiaInvalida('La garantia no puede ser negativo')
+        self.__garantia=garantia
     
-    def validar_descuento(funcion)->List[Dict[str,Any]]:
-        def wrapper(self,descuento:float)->None:
-            try:
-                if descuento<=0:
-                    raise ManageError('El porcentaje de descuento debe ser mayor a cero')
-                resultado=funcion(self,descuento)
-                return resultado
-            except ManageError as e:
-                print(f"Error: {e}")
-        return wrapper
+if __name__ == "__main__":
+    productos_guardados:List[Producto]=[]
+    lista:List[Tuple[Any]]=[]
     
-    def tiempo_ejecucion(funcion):
-        def wrapper(*args,**kargs)->Any:
+    def calcular_tiempo(funcion):
+        def wrapper(*args)->Any:
             inicio=time.time()
-            resultado=funcion(*args,**kargs)
+            result=funcion(*args)
             fin=time.time()
-            print(f"Tiempo de ejecución de la función '{funcion.__name__}': {fin-inicio:.4f} segundos")
-            return resultado
+            print(f"El tiempo de ejecución de la funcion '{funcion.__name__}' es de: {fin-inicio:.5f} segundos")
+            return result
+        return wrapper
+
+    @calcular_tiempo
+    def cargar_productos(datos)->None:
+        
+        for item in datos:
+            try:
+                codigo,nombre,precio,*resto=item
+                producto=Producto(codigo,nombre,precio,*resto)
+                productos_guardados.append(producto)
+            except ManejarError as e:
+                print(f"Error al cargar el producto {nombre}: {e}")
+            finally:
+                continue
+
+
+    def validar_descuento(funcion):
+        def wrapper(*args):
+            if args[0]<=0:
+                raise ManejarError('El porcentaje de descuento debe ser mayor a cero')
+            funcion(*args)
         return wrapper
     
     @validar_descuento
-    @tiempo_ejecucion
-    def aplicar_descuento(self,descuento:float)->List[Dict[str,Any]]:
+    @calcular_tiempo
+    def aplicar_descuento_masivo(descuento:float)->None:
         global productos_guardados
-        productos_descuento=list(map(lambda producto:{**producto,'precio':producto['precio']-(producto['precio']*descuento/100)},productos_guardados))
-        productos_guardados=productos_descuento
-        return productos_guardados
+        def aplicar_descuento(descuento:float,producto:object):
+            producto.precio-=producto.precio*descuento/100
+            return producto
+        productos_guardados=list(map(lambda p:aplicar_descuento(descuento,p),productos_guardados))
 
-    @tiempo_ejecucion
-    def total_inventario(self)->List[Any]:
-        #total_productos=[producto['precio']*producto['stock'] for producto in productos_guardados]
-        total_productos=list(map(lambda producto:producto['precio']*producto['stock'],productos_guardados))
-        return sum(total_productos)
-
-    def agregar_producto(self,objeto)->None:
-        producto={
-            'codigo':objeto.codigo,
-            'nombre':objeto.nombre,
-            'precio':objeto.precio,
-            'stock':objeto.stock,
-            'categoria':objeto.categoria,
-            'tipo':objeto.tipo,
-            'garantia':objeto.garantia
-        }
-        productos_guardados.append(producto)
+    @calcular_tiempo
+    def calcular_total_inventario()->int:
+        return round(sum(list(map(lambda p: p.precio*p.stock,productos_guardados))),4)
     
+    @calcular_tiempo
+    def calcular_total_stock()->int:
+        return sum(list(map(lambda p: p.stock,productos_guardados)))
     
+    def generar_reporte(productos,total)->None:
+        lista=[]
+        encabezado=['Código','Nombre','Precio','Stock','Tipo','Fecha','Garantia','Total']
+        for p in productos:
+            *valores,=(p.codigo,p.nombre,p.precio,p.stock,p.tipo,p.fecha_vencimiento,p.garantia)
+            lista.append((*valores,round(p.precio*p.stock,4)))
+        lista.append(('','','','','','','Total',round(total,4)))
+        print(tabulate(lista,headers=encabezado,tablefmt="pretty"))
 
-productos=[
-            ('1231','Producto1',150.50,20,'Categoria1','Tipo1',2),
-            ('1232','Producto2',230.32,20,'Categoria2','Tipo2',1),
-            ('1233','Producto3',750.23,20,'Categoria3','Tipo3',1),
-            ('1234','Producto4',350.43,20,'Categoria4','Tipo4',2),
-            ('1235','Producto5',1239.46,20,'Categoria5','Tipo5',2)
-          ]
+    @calcular_tiempo
+    def reporte_productos()->None:
+        total=calcular_total_inventario()
+        generar_reporte(productos_guardados,total)
 
-for producto in productos:
-     producto=Producto(*producto)
-     producto.agregar_producto(producto)
+    def productos_con_vencimiento()->None:
+        productos=list(filter(lambda p: p.fecha_vencimiento.lower()!="sin fecha vencimiento",productos_guardados))
+        if not productos:
+            raise ManejarError('No hay productos con ese tipo')
+        total=sum(list(map(lambda p: p.precio*p.stock,productos)))
+        generar_reporte(productos,total)
+        
+    def productos_por_tipo(tipo)->None:
+        if not isinstance(tipo,str):
+            raise ManejarError('El tipo debe ser texto')
+        productos=list(filter(lambda p: p.tipo.lower()==tipo.lower(),productos_guardados))
+        if not productos:
+            raise ManejarError('No hay productos con ese tipo')
+        total=sum(list(map(lambda p: p.precio*p.stock,productos)))
+        generar_reporte(productos,total)
 
 
-print(producto.aplicar_descuento(50))
-print(producto.total_inventario())
+    try:
+        #datos de los productos a instanciar
+        datos=[
+            ('1','Producto1',15.50,20,'Tipo1',"12/12/2025",1),
+            ('2','Producto2',253.34,30,'Tipo2','Sin fecha Vencimiento',1),
+            ('3','Producto3',434.67,20,'Tipo1','Sin fecha Vencimiento',1),
+            ('4','Producto4',2302.10,15,'Tipo3','Sin fecha Vencimiento',1),
+            ('5','Producto5',20.99,20,'Tipo1','13/02/2026',1)
+        ]
+        
+        cargar_productos(datos)
+
+        #print(f"El total de inventario es: {calcular_total_inventario()}")
+        #print(f"El total de stock es: {calcular_total_stock()}")
+        
+        # aplicar_descuento_masivo(50)
+
+        reporte_productos()
+        #productos_con_vencimiento()
+        #productos_por_tipo("Tipo1")
 
 
+        
 
+    except ManejarError as e:
+        print(f"Error: {e}")
